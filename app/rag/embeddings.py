@@ -11,7 +11,17 @@ from app.config import (
 
 MODEL_NAME = "all-MiniLM-L6-v2"
 
-model = SentenceTransformer(MODEL_NAME)
+model = None
+
+
+def get_model():
+    global model
+
+    if model is None:
+        print("Loading embedding model...")
+        model = SentenceTransformer(MODEL_NAME)
+
+    return model
 
 
 def build_vector_store(documents):
@@ -20,19 +30,19 @@ def build_vector_store(documents):
 
     print("Generating embeddings...")
 
+    model = get_model()
+
     embeddings = model.encode(
         texts,
         convert_to_numpy=True,
         show_progress_bar=True,
-        normalize_embeddings=True,   # ⭐ Important
     )
 
     dimension = embeddings.shape[1]
 
-    # ⭐ Cosine similarity using Inner Product
-    index = faiss.IndexFlatIP(dimension)
+    index = faiss.IndexFlatL2(dimension)
 
-    index.add(embeddings.astype(np.float32))
+    index.add(embeddings.astype("float32"))
 
     Path("vector_store").mkdir(exist_ok=True)
 

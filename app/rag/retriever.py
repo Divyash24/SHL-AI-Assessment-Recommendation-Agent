@@ -1,6 +1,5 @@
 import pickle
 import faiss
-import numpy as np
 from sentence_transformers import SentenceTransformer
 
 from app.config import (
@@ -11,40 +10,48 @@ from app.config import (
 
 MODEL_NAME = "all-MiniLM-L6-v2"
 
-model = SentenceTransformer(MODEL_NAME)
+model = None
+index = None
+documents = None
 
-# Load FAISS index
-index = faiss.read_index(VECTOR_INDEX_PATH)
 
-# Load metadata
-with open(METADATA_PATH, "rb") as f:
-    documents = pickle.load(f)
+def load_resources():
+    global model, index, documents
+
+    if model is None:
+        print("Loading embedding model...")
+        model = SentenceTransformer(MODEL_NAME)
+
+    if index is None:
+        print("Loading FAISS index...")
+        index = faiss.read_index(VECTOR_INDEX_PATH)
+
+    if documents is None:
+        print("Loading metadata...")
+        with open(METADATA_PATH, "rb") as f:
+            documents = pickle.load(f)
 
 
 def retrieve(query, top_k=TOP_K_RESULTS):
-    """
-    Retrieve top-k relevant assessments using cosine similarity.
-    """
+
+    load_resources()
 
     query_embedding = model.encode(
         [query],
-        convert_to_numpy=True,
-        normalize_embeddings=True,
+        convert_to_numpy=True
     )
 
-    scores, indices = index.search(
-        query_embedding.astype(np.float32),
+    distances, indices = index.search(
+        query_embedding.astype("float32"),
         top_k,
     )
 
     results = []
 
-    for idx, score in zip(indices[0], scores[0]):
+    for idx, distance in zip(indices[0], distances[0]):
 
         doc = documents[idx].copy()
-
-        doc["score"] = round(float(score), 4)
-
+        doc["score"] = float(distance)
         results.append(doc)
 
     return results
